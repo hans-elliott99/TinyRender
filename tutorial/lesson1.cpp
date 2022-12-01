@@ -115,11 +115,11 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color)
      can access its relevant vertices by indexing the 0th, 1st, and 2nd vertex within the face.
     -Now that we have the vertices stored in our vec structs (geometry.h) we can scale the x and y
      coordinates. The tutorial adds 1 to each (I'm not sure why this is, OBJ files are unitless so
-     pit is difficult to say for the "african_head" example. It may be just to keep the coordinates
+     it is difficult to say for the "african_head" example. It may be just to keep the coordinates
      positive, since they appear to be between -1 and 1. Removing the +1 results in an image that is
-     not correctly positioned.). (Also, translating all the vertices by a constant scalar will not
-     affect the output shape, just its position in the image).
-     Then we scale the coords. by width or height /2 so that the the output is centered within our image.
+     not correctly positioned, because when it is scaled up to pixel dimensions some are outside negative.)
+    -Then we scale the coords. by width or height /2 so that the the output maps to specific pixels and 
+     is centered within our image.
      Thus, after scaling the coordinates they are equivalent to a pixel within our image.
     -Also note that, for now, we are doing nothing with the z dimension.
     */

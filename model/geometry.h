@@ -1,6 +1,7 @@
 /* implement some basic vector geometry */
 #include <iostream>
 #include <cmath>
+#include <assert.h>
 
 #pragma once
 
@@ -14,6 +15,8 @@ template <class T> struct Vec2
     };
     Vec2() : u(0), v(0) {}
     Vec2(T _u, T _v) : u(_u), v(_v) {}
+	inline T&      operator[](const int i)       {assert(i>=0 && i < 2); return raw[i]; } 		
+	inline T& 	   operator[](const int i) const {assert(i>=0 && i < 2); return raw[i]; } 				
     inline Vec2<T> operator+(const Vec2<T> &V) const { return Vec2<T>(u + V.u, v + V.v); }
     inline Vec2<T> operator-(const Vec2<T> &V) const { return Vec2<T>(u - V.u, v - V.v); }
     inline Vec2<T> operator *(float f)          const { return Vec2<T>(u*f, v*f); }
@@ -28,9 +31,21 @@ template <class T> struct Vec3
 		struct {T ivert, iuv, inorm; };
 		T raw[3];
 	};
-	Vec3() : x(0), y(0), z(0) {}
-	Vec3(T _x, T _y, T _z) : x(_x),y(_y),z(_z) {}
-	inline Vec3<T> operator ^(const Vec3<T> &v) const { return Vec3<T>(y*v.z-z*v.y, z*v.x-x*v.z, x*v.y-y*v.x); }
+	Vec3<T>() : x(0), y(0), z(0) {}
+	Vec3<T>(T _x, T _y, T _z) : x(_x),y(_y),z(_z) {}
+	template <class Y> Vec3<T>(const Vec3<Y> &v);
+
+	Vec3<T> & operator=(const Vec3<T> &v) {
+        if (this != &v) {
+            x = v.x;
+            y = v.y;
+            z = v.z;
+        }
+        return *this;
+    }
+	inline T&      operator[](const int i)       {assert(i>=0 && i < 3); return raw[i]; } 		
+	inline T& 	   operator[](const int i) const {assert(i>=0 && i < 3); return raw[i]; } 				
+	inline Vec3<T> operator ^(const Vec3<T> &v) const { return Vec3<T>(y*v.z-z*v.y, z*v.x-x*v.z, x*v.y-y*v.x); } //cross-product with external vec
 	inline Vec3<T> operator +(const Vec3<T> &v) const { return Vec3<T>(x+v.x, y+v.y, z+v.z); }
 	inline Vec3<T> operator -(const Vec3<T> &v) const { return Vec3<T>(x-v.x, y-v.y, z-v.z); }
 	inline Vec3<T> operator *(float f)          const { return Vec3<T>(x*f, y*f, z*f); }
@@ -45,8 +60,6 @@ typedef Vec2<float> Vec2f;
 typedef Vec2<int>   Vec2i;
 typedef Vec3<float> Vec3f;
 typedef Vec3<int>   Vec3i;
-
-
 
 template <class t> std::ostream& operator<<(std::ostream& s, Vec2<t>& v) {
 	s << "(" << v.x << ", " << v.y << ")\n";
