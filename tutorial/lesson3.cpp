@@ -71,12 +71,23 @@ Vec3f barycentric(Vec3f *pts, Vec3f P)
         rendered since it point falls outside of the triangle.
         If it does fall within the triangle:
             We position the current point P's depth at the weighted sum of the triangle's
-            vertices' z-dimensions, where the weights are the barycentric coordinates.
+            vertices' z-dimensions, where the weights are the barycentric coordinates.**
             Then, if the current points depth is closer to the camera (ie, has a larger value
             than) the z-buffer, we render the pixel and we update the zbuffer so that the new
             closest depth at that pixel is that of current point P. 
             If the depth is NOT closer than the z-buffer, we do not render this point since there
             are other pixels which cover it up.
+
+            **more on the computation of the point's depth: 
+                We know the triangle's vertices' Z-coordinates, so to compute the actual depth of 
+                the current point P, we need to interpolate between all the vertices' z-coordinates.
+                We use the barycentric coordinates to do so:
+                "If the barycentric coordinates are used to compute the position of a point located
+                 on the triangle using the triangle vertices, we can interpolate any other data defined
+                 at the triangle's vertices (like for example the color) in the exact same way.
+                 In other words, barycentric coordinates are used to interpolate vertex data across the
+                 triangle's surface (the technique can be applied to any data type, float, color, etc.). "
+                 - https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates
 */
 
 void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color)
@@ -149,7 +160,7 @@ void illuminate_model(Model &model, TGAImage &image)
         if (intensity > 0)
         {
             triangle(screen_coords, zbuffer, image,
-                     TGAColor(intensity*255, intensity*255, intensity*255, 255)
+                     TGAColor(intensity*225, intensity*193, intensity*110, 255)
                     );
         }
     }
@@ -160,10 +171,21 @@ void illuminate_model(Model &model, TGAImage &image)
 /*Attempting to add Texture
     -Mapping in the "diffuse map" using the vertex-texture ("vt") coords.
     The tutorial does not do it with barycentric coord method (yet), nonetheless I tried (unsuccessfully).
-    -Ultimately I went back to the line sweeping method - this is intuitive since we can interpolate between
-    points in the texture image just as we interpolate between the triangle's points. So as we sweep across the
-    triangle from one side to the other, we also sample the RGB color at the corresponding pixel in the texture
-    image.
+    -As before, we create a bounding box and calculate the barycentric coordinates for each point to determine
+    if the point is in the triangle.
+    -Now we also use the barycentric points to to calculate the uv points which index into our texture map.
+     The barycentric coordinates define the position of our current point P in relation to a triangle - 
+        specifically the triangle we have provided and wish to draw. As above, barycentric coordinates allow us 
+        to interpolate across that triangle, this time for the purpose of pulling in a color value from the texture map.**
+
+    **More on mapping our square texture onto a triangle:
+        https://computergraphics.stackexchange.com/questions/1866/how-to-map-square-texture-to-triangle:
+        "First, we find the barycentric coordinates of P. Barycentric coordinates represent how much weight each vertex
+         contributes to the point, and can be used to interpolate any value which is known at the vertices across the face
+         of a triangle...
+         Once you have [barycentric] coordinates, you can determine the texture coordinates of P by interpolating the values 
+         at the vertices using the barycentric coordinates as weights"
+
 */
 Vec3f barycentric(Vec3i *pts, Vec3i P)
 {
@@ -176,26 +198,26 @@ Vec3f barycentric(Vec3i *pts, Vec3i P)
     return Vec3f(-1, -1, -1);
 }
 
-void bad_texture_triangle(Vec3i *pts, int *zbuffer,  Vec2i *uvPts, float intensity, TGAImage &diffusemap, TGAImage &image)
+void texture_triangle(Vec3i *pts, int *zbuffer,  Vec2i *uvPts, float intensity, TGAImage &diffusemap, TGAImage &image)
 {
     Vec2i bboxmin( std::numeric_limits<int>::max(),  std::numeric_limits<int>::max() );
     Vec2i bboxmax( -std::numeric_limits<int>::max(), -std::numeric_limits<int>::max() );
     Vec2i clamp(image.width() - 1, image.height() - 1); //clip bb to image dims if triangle extends outside image
     // Compute bounding box
-    for (int i = 0; i < 3; i++) //for triangle vertex i
-        for (int j = 0; j < 2; j++) //for coord (of x,y) j
+    for (int i = 0; i < 3; i++) //for each triangle vertex, i
+        for (int j = 0; j < 2; j++) //for each coord (x & y), j
         {
             bboxmin[j] = std::max(0,     std::min(bboxmin[j], pts[i][j]));
             bboxmax[j] = std::max(clamp[j], std::max(bboxmax[j], pts[i][j]));
         }
-    Vec3f P;
+    Vec3i P;
     // For all points within the bounding box, computer the barycentric
     // coordinates. If any are less than 0, the current point is not in
     // the triangle, and we should skip. Otherwise, determine if the
     // point's z dimension (depth) is closer to camera then the z buffer,
     // and only render the point if it is.
-    float uv_rescale_h = (float)diffusemap.height() / (float)height;
-    float uv_rescale_w = (float)diffusemap.width() / (float)width;
+    // Use the barycentric coords. to calculate depth and to interpolate
+    // the uv points.
     for (P.x = bboxmin.x; P.x <= bboxmax.x; P.x++)
         for (P.y = bboxmin.y; P.y <= bboxmax.y; P.y++)
         {
@@ -209,16 +231,14 @@ void bad_texture_triangle(Vec3i *pts, int *zbuffer,  Vec2i *uvPts, float intensi
             if ( zbuffer[idx] < P.z )
             {
                 zbuffer[idx] = P.z;
-                /*My makeshift inteprolation idea doesnt work. The tutorial does it with the
-                line sweeping triangle method : https://github.com/ssloy/tinyrenderer/blob/1cce85258d1f1cf75fd10fe4d62ebfdb669f8cf9/main.cpp#L42
-                which allows for interpolating between the color values at all the texture points.
-                Here I try to just scale the current pixel P's location to the scale of the texture map, doesn't quite work.
-                The color looks correct, but the texture is warped, perhaps need to convert from 2d to 3d correctly?
-                */
-                Vec2i uvP = {(int)((P.x)*uv_rescale_w),
-                             (int)((P.y)*uv_rescale_h)};
-                
-                TGAColor color = diffusemap.get(uvP.x, uvP.y);
+                Vec2f uv(0,0);
+                for (int i = 0; i < 3; i++)
+                {
+                    uv.x += uvPts[i].x * bc[i];
+                    uv.y += uvPts[i].y * bc[i];
+                }
+
+                TGAColor color = diffusemap.get(uv.x, uv.y);
 
                 image.set(
                     P.x, P.y, 
@@ -230,7 +250,90 @@ void bad_texture_triangle(Vec3i *pts, int *zbuffer,  Vec2i *uvPts, float intensi
 }
 
 
-void texture_triangle(Vec3i* pts, Vec2i* uv, float intensity, int *zbuffer, TGAImage &diffusemap, TGAImage &image) {
+// Adding Texture
+/*Here we get our diffuse map (the texture map) which was loaded by the model,
+    then initialize the z-buffer and light direction.
+    Then we began iterating through the faces in our model. For each face,
+    we get the triangle coordinates and scale them to screen size. We also get
+    the coordinates for our texture map.
+    Then we compute the triangle's normal to calculate the light intensity,
+    and only draw the triangle if the intensity is positive (back-face culling).
+    The triangle rasterization method needs the triangle scren coordinates, the
+    texture coordinates for mapping each pixel to the correct color value, the intensity
+    level for modifying the color based on light intensity, the zbuffer to determine depth
+    (ie, should each pixel be drawn or is it hidden by other faces), the diffuse texture map to
+    sample color/texture from, and the image to draw onto. 
+*/
+void render_texture_model(Model &model, TGAImage &image)
+{
+    /*Load in model's diffuse map for texture mapping*/
+    TGAImage diffuse_map = model.diffuse();
+
+    /*Initialize zbuffer with smallest possible depth (so we
+        start rendering infront of the zbuffer*/
+    int *zbuffer = new int[width*height];
+    for (int i=0; i < width*height; i++)
+        zbuffer[i] = std::numeric_limits<int>::min();
+
+    /*Specify light vector for illumniation*/
+    Vec3f light_dir(0, 0, -1);
+
+    /*Iterate through the model's triangles ("faces") and render via the
+     bounding-box + barycentrix-coords method, while also checking the z-buffer to
+     remove "hidden" faces.
+      */
+    for (int i = 0; i < model.nfaces(); i++)
+    {
+        Vec3i screen_coords[3]; 
+        Vec3f world_coords[3]; 
+        Vec2i tex_coords[3];
+        for (int j = 0; j < 3; j++)  
+        {
+            Vec3f v = model.vert( i, j );
+            Vec2f uv = model.uv( i, j );
+            screen_coords[j] = world2screen(v); //scale "world" coords to fit screen
+            world_coords[j] = v;
+            tex_coords[j] = {(int)(uv.x * diffuse_map.width()), (int)(uv.y * diffuse_map.height())};
+        }
+        // Compute triangle's normal and use to calculate light intensity fr the current face
+        Vec3f n = (world_coords[2] - world_coords[0]) ^ (world_coords[1]-world_coords[0]); //side 1 cross-product side 2
+        n.normalize();
+        float intensity = n*light_dir;
+
+        if (intensity > 0)
+        {
+            texture_triangle(screen_coords, zbuffer, tex_coords, intensity, diffuse_map, image);
+        }
+    }
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+int main(int argc, char** argv)
+{ 
+    const char* mod;
+    if (argc==1)
+        mod = "../obj/african_head.obj";     
+    else
+        mod = argv[1];
+
+    Model model(mod);
+    TGAImage image(width, height, TGAImage::RGB);
+
+    render_texture_model(model, image);
+    image.write_tga_file("out.tga");
+}
+
+
+
+
+
+
+
+// How to implement textured triangle with the line sweeping method
+
+void linesweep_texture_triangle(Vec3i* pts, Vec2i* uv, float intensity, int *zbuffer, TGAImage &diffusemap, TGAImage &image) {
     if (pts[0].y==pts[1].y && pts[0].y==pts[2].y) return; // degenerate triangle
     // Sort points so point 0 is bottom left and point 2 is top right
     if (pts[0].y>pts[1].y) { std::swap(pts[0], pts[1]); std::swap(uv[0], uv[1]); }
@@ -272,79 +375,3 @@ void texture_triangle(Vec3i* pts, Vec2i* uv, float intensity, int *zbuffer, TGAI
 }
 
 
-
-// Adding Texture
-/*Here we get our diffuse map (the texture map) which was loaded by the model,
-    then initialize the z-buffer and light direction.
-    Then we began iterating through the faces in our model. For each face,
-    we get the triangle coordinates and scale them to screen size. We also get
-    the coordinates for our texture map.
-    Then we compute the triangle's normal to calculate the light intensity,
-    and only draw the triangle if the intensity is positive (back-face culling).
-    The triangle rasterization method needs the triangle scren coordinates, the
-    texture coordinates for mapping each pixel to the correct color value, the intensity
-    level for modifying the color based on light intensity, the zbuffer to determine depth
-    (ie, should each pixel be drawn or is it hidden by other faces), the diffuse texture map to
-    sample color/texture from, and the image to draw onto. 
-*/
-void render_texture_model(Model &model, TGAImage &image)
-{
-    /*Load in model's diffuse map for texture mapping*/
-    TGAImage diffuse_map = model.diffuse();
-
-    /*Initialize zbuffer with largest possible negative depth (so we
-        start rendering infront of the zbuffer*/
-    int *zbuffer = new int[width*height];
-    for (int i=0; i < width*height; i++)
-        zbuffer[i] = std::numeric_limits<int>::min();
-
-    /*Specify light vector for illumniation*/
-    Vec3f light_dir(0, 0, -1);
-
-    /*Iterate through the model's triangles ("faces") and render via the
-     bounding-box + barycentrix-coords method, while also checking the z-buffer to
-     remove "hidden" faces.
-      */
-    for (int i = 0; i < model.nfaces(); i++)
-    {
-        Vec3i screen_coords[3]; 
-        Vec3f world_coords[3]; 
-        Vec2i tex_coords[3];
-        for (int j = 0; j < 3; j++)  
-        {
-            Vec3f v = model.vert( i, j );
-            Vec2f uv = model.uv( i, j );
-            screen_coords[j] = world2screen(v); //scale "world" coords to fit screen
-            world_coords[j] = v;
-            tex_coords[j] = {(int)(uv.x * diffuse_map.width()), (int)(uv.y * diffuse_map.height())};
-        }
-        // Compute triangle's normal and use to calculate light intensity fr the current face
-        Vec3f n = (world_coords[2] - world_coords[0]) ^ (world_coords[1]-world_coords[0]); //side 1 cross-product side 2
-        n.normalize();
-        float intensity = n*light_dir;
-
-        if (intensity > 0)
-        {
-            texture_triangle(screen_coords, tex_coords, intensity, zbuffer, diffuse_map, image);       //to produce equivalent map
-            // bad_texture_triangle(screen_coords, zbuffer, tex_coords, intensity, diffuse_map, image);
-        }
-    }
-}
-
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char** argv)
-{ 
-    const char* mod;
-    if (argc==1)
-        mod = "../obj/african_head.obj";     
-    else
-        mod = argv[1];
-
-    Model model(mod);
-    TGAImage image(width, height, TGAImage::RGB);
-
-    render_texture_model(model, image);
-    image.write_tga_file("out.tga");
-}

@@ -18,6 +18,8 @@ private:
     // TGAImage normalmap{};          // normal map texture
     // TGAImage specularmap{};        // specular map texture
 
+    bool diffuse_success{false};
+
     void load_texture(const std::string filename, const std::string suffix, TGAImage &img);
 
 public:

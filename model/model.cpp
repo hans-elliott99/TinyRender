@@ -126,12 +126,12 @@ void Model::load_texture(std::string filename, const std::string suffix, TGAImag
     size_t dot = filename.find_last_of(".");
     if (dot == std::string::npos) return; //no file extension
     std::string texfile = filename.substr(0, dot) + suffix;
-    std::cerr << "texture file " << texfile << " | loading " << (img.read_tga_file(texfile.c_str()) ? "ok" : "failed") << std::endl;
+    diffuse_success = img.read_tga_file(texfile.c_str());
+
+    std::cerr << "texture file " << texfile << " | loading " << texfile.c_str()
+              << (diffuse_success ? " -success" : " -fail") << std::endl;
     
 }
-
-
-
 
 
 
