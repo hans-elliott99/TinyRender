@@ -116,8 +116,9 @@ Vec2f Model::uv(const int iface, const int nthvert) const
     return tex_coord[ facet_t[iface*3 + nthvert] ];
 }
 
-// Vec3f Model::normal
-
+Vec3f Model::normal(const int iface, const int nthvert) const {
+    return norms[facet_n[iface*3 + nthvert]];
+}
 
 
 
