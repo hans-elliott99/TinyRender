@@ -422,7 +422,16 @@ void gourard_draw(Model &model, int *zbuffer, TGAImage& image)
 
 
 
-
+/*
+    A note on normal vectors:
+    If we transform the coordinates of a model with affine transformations (as above), we transform the
+    *normal vectors* with a mapping equivalent to the transposition of the inverse matrix of the original
+    affing transformation. 
+    This means that we cannot simply transform normal vectors, and instead need to compute new ones based
+    on the transformed model.
+    (The tutorial has a really good walkthrough of why: https://github.com/ssloy/tinyrenderer/wiki/Lesson-5:-Moving-the-camera , scroll to bottom)
+    
+*/
 
 
 
