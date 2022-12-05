@@ -7,8 +7,24 @@
 /*
     Lesson 4-5 Reworked:
     Refactored/simplified geometry code (vectors simply store floats).
-    Fixed some bugs:  
-
+    Fixed some bugs.  
+    Overall pipeline:
+        Read in model's faces, vertex coordinates ("world" coords), vertex normals (for shading), and texture (uv) coordinates.
+        For each face (triangle), apply transformations to the vertex coords to: 
+            A) move the camera (ie, change the ModelView, ie, lookat)
+            B) project the 3d coordinates to 2d (ie, perspective projection)
+            C) convert from model's "world" coordinates to screen coordinates (ie, viewport).
+        Pass all this to the triangle rasterizer which:
+            A) computes a bounding box given the screen coordinates
+            B) determines if each point in the BB is in the triangle based on barycentric coords
+            C) if in the triangle, the pixel can be drawn if its z coord is greater than its z-buffer value:
+                - calculate the z/depth coordinate using the barycentric coords & compare to current z-buff value
+            D) if drawing, use the uv coordinates to pull in the color from the texture map (diffusemap)
+                - we have texture coordinates which correspond to the triangle's vertices, so
+                - interpolate across the triangle using the barycentric coords.
+            C) finally, use Gourard shading to modify the texture-map color for shading
+                - we have normal coordinates which correspond to the triangle's vertices, so
+                - interpolate across the triangle using the barycentric coordinates.
 */
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
@@ -216,10 +232,13 @@ void render_model(Model &model, TGAImage &image)
 
 
 
-int main()
+int main(int argc, char** argv)
 {
     TGAImage image(width, height, TGAImage::RGB);
-    Model model("../obj/african_head.obj");
+
+    Model model = Model("../obj/african_head.obj");
+    if (argc > 1)
+        Model model = Model(argv[1]);
 
     render_model(model, image);
     std::cout <<"saving\n";
