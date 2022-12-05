@@ -1,5 +1,3 @@
-/*https://github.com/ssloy/tinyrenderer*/
-
 #pragma once
 #include <cstdint>
 #include <fstream>
@@ -26,17 +24,13 @@ struct TGAColor {
     std::uint8_t bgra[4] = {0,0,0,0};
     std::uint8_t bytespp = {0};
 
-    std::uint8_t* b = &bgra[0];
-    std::uint8_t* g = &bgra[1];
-    std::uint8_t* r = &bgra[2];
-    std::uint8_t* a = &bgra[3];
-
     TGAColor() = default;
     TGAColor(const std::uint8_t R, const std::uint8_t G, const std::uint8_t B, const std::uint8_t A=255) : bgra{B,G,R,A}, bytespp(4) { }
     TGAColor(const std::uint8_t *p, const std::uint8_t bpp) : bytespp(bpp) {
         for (int i=bpp; i--; bgra[i] = p[i]);
     }
 
+    TGAColor&     operator *(const double s) { for (int i=0;i<3;i++) bgra[i] = bgra[i]*s; return *this; }
     std::uint8_t& operator[](const int i) { return bgra[i]; }
 };
 
@@ -62,4 +56,3 @@ private:
     int bpp = 0;
     std::vector<std::uint8_t> data = {};
 };
-

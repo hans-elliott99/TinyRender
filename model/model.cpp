@@ -42,19 +42,19 @@ Model::Model(const char *filename)
         if (!line.compare(0, 2, "v "))
         {
             iss >> trash;
-            Vec3f v;
-            for (int i=0; i < 3; i++) iss >> v.raw[i];
+            vec3 v;
+            for (int i=0; i < 3; i++) iss >> v[i];
             verts.push_back(v);
         } else if (!line.compare(0, 3, "vn ")) 
         {
             iss >> trash >> trash;
-            Vec3f n;
+            vec3 n;
             for (int i=0;i<3;i++) iss >> n[i];
             norms.push_back( n.normalize() );
         } else if (!line.compare(0, 3, "vt "))
         {
             iss >> trash >> trash;
-            Vec2f uv;
+            vec2 uv;
             for (int i=0;i<2;i++) iss >> uv[i];
             tex_coord.push_back( {uv.x, 1-uv.y} );
         } else if (!line.compare(0, 2, "f "))
@@ -100,23 +100,23 @@ int Model::nfaces() const
     return facet_v.size()/3;
 }
 
-Vec3f Model::vert(const int i) const
+vec3 Model::vert(const int i) const
 {
     return verts[i];
 }
 
-Vec3f Model::vert(const int iface, const int nthvert) const
+vec3 Model::vert(const int iface, const int nthvert) const
 {
     return verts[ facet_v[iface*3 + nthvert] ];
 }
 
 
-Vec2f Model::uv(const int iface, const int nthvert) const
+vec2 Model::uv(const int iface, const int nthvert) const
 {
     return tex_coord[ facet_t[iface*3 + nthvert] ];
 }
 
-Vec3f Model::normal(const int iface, const int nthvert) const {
+vec3 Model::normal(const int iface, const int nthvert) const {
     return norms[facet_n[iface*3 + nthvert]];
 }
 

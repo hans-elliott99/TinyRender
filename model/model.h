@@ -7,9 +7,9 @@
 class Model
 {
 private:
-    std::vector<Vec3f> verts {};
-    std::vector<Vec2f> tex_coord {};
-    std::vector<Vec3f> norms {};
+    std::vector<vec3> verts {};
+    std::vector<vec2> tex_coord {};
+    std::vector<vec3> norms {};
 
     std::vector<int> facet_v {};
     std::vector<int> facet_t {};
@@ -28,14 +28,14 @@ public:
     int nverts() const;
     int nfaces() const;
 
-    Vec3f normal(const int iface, const int nthvert) const; // per triangle corner normal vertex
-    Vec3f normal(const Vec2f &uv) const;                     // fetch the normal vector from the normal map texture
-    Vec3f vert(const int i) const;
-    Vec3f vert(const int iface, const int nthvert) const;
-    Vec2f uv(const int iface, const int nthvert) const;
+    vec3 normal(const int iface, const int nthvert) const; // per triangle corner normal vertex
+    vec3 normal(const vec2 &uv) const;                     // fetch the normal vector from the normal map texture
+    vec3 vert(const int i) const;
+    vec3 vert(const int iface, const int nthvert) const;
+    vec2 uv(const int iface, const int nthvert) const;
     
     const TGAImage& diffuse()  const { return diffusemap;  }
-    TGAColor diffuse_get(Vec2i uv) {return diffusemap.get(uv.x, uv.y); }
+    TGAColor diffuse_get(vec2 uv) {return diffusemap.get(uv.x, uv.y); }
     // const TGAImage& specular() const { return specularmap; }
 
     std::vector<int> face(int idx);
