@@ -1,8 +1,8 @@
 #include <iostream>
 #include <vector>
-#include "../tga/tgaimage.h"
-#include "../model/geometry.h"
-#include "../model/model.h"
+#include "../src/tgaimage.h"
+#include "../src/geometry.h"
+#include "../src/model.h"
 
 /*
     Lesson 4-5 Reworked:
@@ -11,9 +11,9 @@
     Overall pipeline:
         Read in model's faces, vertex coordinates ("world" coords), vertex normals (for shading), and texture (uv) coordinates.
         For each face (triangle), apply transformations to the vertex coords to: 
-            A) move the camera (ie, change the ModelView, ie, lookat)
-            B) project the 3d coordinates to 2d (ie, perspective projection)
-            C) convert from model's "world" coordinates to screen coordinates (ie, viewport).
+            A) move the camera (ie, change the "Model View", ie, the lookat matrix)
+            B) project the 3d coordinates to 2d (ie, perspective projection, ie projection matrix)
+            C) convert from model's "world" coordinates to screen coordinates (ie, viewport matrix).
         Pass all this to the triangle rasterizer which:
             A) computes a bounding box given the screen coordinates
             B) determines if each point in the BB is in the triangle based on barycentric coords
@@ -34,19 +34,10 @@ const int width  = 800;
 const int height = 800;
 const int depth = 255;
 
-vec3 light_dir = vec3(0,0,-1).normalize();
+vec3 light_dir = vec3(1,1,1).normalize();
 vec3 eye(1,1,3);
 vec3 center(0,0,0);
 
-
-vec3 world2screen(vec3 v)
-{
-    return vec3(
-        int((v.x + 1.) * width/2. + .5),
-        int((v.y + 1.) * height/2. + .5),
-        v.z
-    );
-}
 
 // Convert vector to matrix, with homogeneous coords
 mat<4,1> v2m(vec3 v)
@@ -186,7 +177,7 @@ void triangle(vec3 *pts, vec2 *uvPts, int *zbuffer, TGAImage &diffusemap, TGAIma
 /*Gourard Shading, Texture Mapping*/
 void render_model(Model &model, TGAImage &image)
 {
-    TGAImage diffusemap = model.diffuse();
+    TGAImage diffusemap = model.get_diffuse();
     /*Initialize zbuffer with largest possible negative depth (so we
         start rendering infront of the zbuffer*/
     int *zbuffer = new int[width*height];
