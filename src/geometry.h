@@ -49,13 +49,22 @@ template<int n> vec<n> operator/(const vec<n>& lhs, const float& rhs) {
     return ret;
 }
 
-template<int n1,int n2> vec<n1> embed(const vec<n2> &v, float fill=1) {
-    vec<n1> ret;
-    for (int i=n1; i--; ret[i]=(i<n2?v[i]:fill));
+template<int n> vec<n> operator/(const float& lhs, const vec<n>& rhs) {
+    vec<n> ret = lhs;
+    for (int i=n; i--; ret[i] = lhs/ret[i]);
     return ret;
 }
 
-template<int n1,int n2> vec<n1> proj(const vec<n2> &v) {
+
+template<int n1,int n2>
+vec<n1> embed(const vec<n2> &v, float fill=1) {
+    vec<n1> ret;
+    for (int i=n1; i--; ret[i]=(i<n2 ? v[i] : fill));
+    return ret;
+}
+
+template<int n1,int n2> 
+vec<n1> proj(const vec<n2> &v) {
     vec<n1> ret;
     for (int i=n1; i--; ret[i]=v[i]);
     return ret;

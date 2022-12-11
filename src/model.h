@@ -1,6 +1,6 @@
 #include <vector>
 #include "geometry.h"
-#include "../tga/tgaimage.h"
+#include "tgaimage.h"
 
 #pragma once
 
@@ -14,9 +14,9 @@ private:
     std::vector<int> facet_v {};
     std::vector<int> facet_t {};
     std::vector<int> facet_n {};
-    TGAImage diffusemap{};         // diffuse color texture
-    // TGAImage normalmap{};          // normal map texture
-    // TGAImage specularmap{};        // specular map texture
+    TGAImage diffusemap{};             // diffuse color texture
+    TGAImage normalmap{};              // normal map texture
+    TGAImage specularmap{};            // specular map texture
 
     bool diffuse_success{false};
 
@@ -34,9 +34,9 @@ public:
     vec3 vert(const int iface, const int nthvert) const;
     vec2 uv(const int iface, const int nthvert) const;
     
-    const TGAImage& diffuse()  const { return diffusemap;  }
-    TGAColor diffuse_get(vec2 uv) {return diffusemap.get(uv.x, uv.y); }
-    // const TGAImage& specular() const { return specularmap; }
+    TGAColor diffuse(vec2 uv)  const;
+    TGAImage get_diffuse() {return diffusemap; };
+    float specular(vec2 uv) const;
 
     std::vector<int> face(int idx);
 };

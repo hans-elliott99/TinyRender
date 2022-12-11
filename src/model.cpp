@@ -83,7 +83,10 @@ Model::Model(const char *filename)
              << '\n';
     
     // Load texture
-    load_texture(filename, "_diffuse.tga", diffusemap);
+    load_texture(filename, "_diffuse.tga",    diffusemap);
+    load_texture(filename, "_nm.tga", normalmap  ); //_nm_tangent
+    load_texture(filename, "_spec.tga",       specularmap);
+
 }
 // https://stackoverflow.com/questions/9158894/differences-between-c-string-and-compare
 
@@ -120,6 +123,24 @@ vec3 Model::normal(const int iface, const int nthvert) const {
     return norms[facet_n[iface*3 + nthvert]];
 }
 
+vec3 Model::normal(const vec2 &uv) const {
+    // Sample the color from the normalmap and convert to normal values
+    TGAColor c = normalmap.get(uv[0]*normalmap.width(), uv[1]*normalmap.height());
+    return vec3(c[2], c[1], c[0]) * 2.f/255. - vec3(1,1,1);
+}
+
+
+
+TGAColor Model::diffuse(vec2 uv) const {
+    vec2 _uv(uv[0] * diffusemap.width(), uv[1] * diffusemap.height());
+    return diffusemap.get(_uv[0], _uv[1]);
+}
+
+float Model::specular(vec2 uv) const {
+    vec2 _uv(uv[0]*specularmap.width(), uv[1]*specularmap.height());
+    return specularmap.get(uv[0], uv[1])[0] / 1.f;
+}
+
 
 
 void Model::load_texture(std::string filename, const std::string suffix, TGAImage &img)
@@ -129,7 +150,7 @@ void Model::load_texture(std::string filename, const std::string suffix, TGAImag
     std::string texfile = filename.substr(0, dot) + suffix;
     diffuse_success = img.read_tga_file(texfile.c_str());
 
-    std::cerr << "texture file " << texfile << " | loading " << texfile.c_str()
+    std::cerr << "texture file " << texfile << " | loading " //<< texfile.c_str()
               << (diffuse_success ? " -success" : " -fail") << std::endl;
     
 }
