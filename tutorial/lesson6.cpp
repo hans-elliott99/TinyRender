@@ -11,8 +11,8 @@
 #include "../src/geometry.h"
 #include "../src/graphics.h"
 
-const int width  = 800;
-const int height = 800;
+const int width  = 1200;
+const int height = 1200;
 const int depth = 255;
 
 vec3 light_dir(1,1,1);
@@ -179,6 +179,9 @@ struct PhongShader : public IShader
     Essentially, since the 'normals' we use for light intensity are based on the surface normals of the faces (triangles) that
      make up our model, when we rescale our model's coordinates, the new faces (triangles) need to have their surface normals 
      re-computed.
+    
+    To clarify, we sample a color from our normal texture map, but the RGB components correspond to the X, Y, and Z coordinates,
+    respectively, of the surface normal for the given pixel.
 */
 
 
@@ -296,11 +299,126 @@ struct GourardSpecular : public IShader
 };
 
 
-// 6b:
+/*TANGENT SPACE NORMAL MAPPING
+    We can use a tangent space (aka, Darboux or surface space) normal map instead of an RGB one. A major advantage of using
+    a tangent space map is that it would deform correctly as our model mutated (for example,
+    if we animated it), where as we would need a a new RGB normal map for every frame.  
+    Wikipedia (normal mapping):
+    - The orientation of coordinate axes differs depending on the space in which the normal map was encoded. 
+      A straightforward implementation encodes normals in object-space, so that red, green, and blue components 
+      correspond directly with X, Y, and Z coordinates. In object-space the coordinate system is constant.
+    - However object-space normal maps cannot be easily reused on multiple models, as the orientation of the surfaces differ. 
+      Since color texture maps can be reused freely, and normal maps tend to correspond with a particular texture map, 
+      it is desirable for artists that normal maps have the same property.
+    - Normal map reuse is made possible by encoding maps in tangent space. 
+      The tangent space is a vector space which is tangent to the model's surface. 
+      The coordinate system varies smoothly (based on the derivatives of position with respect to texture coordinates)
+      across the surface.
+
+    It also boost performance by separating changes relative to the object from changes relative to the World Space:
+    - ex: rotating an object in tangent space leaves the relationship between vertices the same, while rotating the
+        object in World space means all pixels need to be recalculated to take in changes for lighting, shading, etc.
+    Video lecture: https://www.youtube.com/watch?v=19dey0OYPYo&ab_channel=MichaelLoeser
+    How to use it:
+        1. Calculate normal vector (per vertex) : which is just the "up" vector, perpendicular to the surface (always positive)
+        2. Calculate tangent vector : can be chosen as desired, but must be parallel to the surface and perpendicular to the normal vector
+        3. Calculate bitangent (or, bi-normal) vector : perpendicular to both the normal and tangent vector.
+        4. Using the Tangent (T), Bitangent (B), and Normal (N) vectors, construct the 3x3 translation matrix:
+            M_tan = [[Tx, Bx, Nx], [Ty, By, Ny], [Tz, Bz, Nz]]
+            - so to move a vertex to tangent space: Position_tan = Position_world X M_tan
+
+        5. To return to world space, we use the inverse Tangent Space matrix, but since each vector is perpendicular (orthogonal) to the other,
+           this is equivalent to the transpose of the matrix (easier to calculate)
+           M_world = [[Tx, Ty, Tz], [Bx, By, Bz], [Nx, Ny, Nz]]
+    The normal maps are generally blue because their RGB values at each pixel make up the normal vector (x,y,z). 
+    Normal vectors have a positive z value, which is the B color value. 
+
+        
+    To use the tangent space normal map we sample a normal vector from the texture map and
+    transform its coordinates from Darboux to the global system coordinates (ie, world coords).  
+
+    In the shader below, we compute a Darboux basis as a triplet of vectors (i,j,n) where n is the normal vector
+    and i and j are computed as below. (See tutorial for matching equations/matrices: 
+        https://github.com/ssloy/tinyrenderer/wiki/Lesson-6bis:-tangent-space-normal-mapping)   
+    Once we have the Darboux basis packaged into the change-of-basis matrix B, we read in the normal
+    from the texture map and multiply with B to change the basis from Darboux space to the world/global coordinates.
+*/
+
+struct TangentNormalShader : public IShader
+{
+    mat<2,3> varying_uv;        //texture coords
+    mat<4,3> varying_tri;       //triangle coords
+    mat<3,3> varying_norm;      //vertex normals to be inerpolated
+    mat<3,3> ndc_tri;           //triangle in normalized device coordinates
+
+    mat<4,4> uniform_M;         //Projection*ModelView)
+    mat<4,4> uniform_Mit;       //(Projection*ModelView).invert_transpose()
+    mat<4,4> ViewPort;          //ViewPort*Projection*ModelView
+
+    Model*   model_ptr;
+
+    TangentNormalShader(mat<4,4> viewport, mat<4,4> projection, mat<4,4> modelview) : 
+        uniform_M  ( projection*modelview ),
+        uniform_Mit( (projection*modelview).invert_transpose() ),
+        ViewPort   ( viewport )
+        { }
+
+    /*Vertex Shader*/
+    vec4 vertex(Model &model, int iface, int nthvert) {
+        model_ptr = &model;
+        varying_uv    .set_col(nthvert, model.uv(iface, nthvert));
+        varying_norm  .set_col( nthvert, proj<3>(uniform_Mit * embed<4>(model.normal(iface, nthvert), 0.f)) );
+        
+        vec4 m_vertex  = uniform_M * embed<4>(model.vert(iface, nthvert));
+        varying_tri   .set_col(nthvert, m_vertex);
+        ndc_tri       .set_col(nthvert, proj<3>(m_vertex/m_vertex[3]));
+
+        return ViewPort*m_vertex;
+    }
+
+    /*Fragment Shader*/
+    bool fragment(vec3 baryc, TGAColor &color) {
+        vec2 uv = varying_uv*baryc;                      /*interpolate uv coordinates for current pixel*/
+        vec3 bn = (varying_norm*baryc).normalize();
+
+        mat<3,3> A;
+        A[0] = ndc_tri.col(1) - ndc_tri.col(0);
+        A[1] = ndc_tri.col(2) - ndc_tri.col(0);
+        A[2] = bn;
+
+        mat<3,3> Ai = A.invert();
+        vec3 i = Ai * vec3(varying_uv[0][1] - varying_uv[0][0], varying_uv[0][2] - varying_uv[0][0], 0);
+        vec3 j = Ai * vec3(varying_uv[1][1] - varying_uv[1][0], varying_uv[1][2] - varying_uv[1][0], 0);
+
+        mat<3,3> B;
+        B.set_col(0, i.normalize());
+        B.set_col(1, j.normalize());
+        B.set_col(2, bn);
+
+        vec3 norm  = (B * model_ptr->normal(uv)).normalize();
+        // vec3 light = proj<3>(uniform_M * embed<4>(light_dir, 0.f)).normalize();  //what tutorial does
+        vec3 light = (B * light_dir).normalize(); //tutorial doesnt translate light with B, but my result looks better w it
+
+        float diffuse  = std::max(0.f, norm*light);
+
+        // (For specular lighting, set to true - can test with and without)
+        bool spec = false;
+        if (spec) {
+            vec3 refl  = (2.f*norm*(norm*light) - light).normalize(); //for specular lighting
+            float specular = pow( std::max(refl.z, 0.f), model_ptr->specular(uv) );
+            TGAColor c = model_ptr->diffuse(uv);
+            for (int i: {0,1,2})
+                color[i] = std::min<float>( 0.5 + c[i]*(diffuse + .3*specular), 255 );
+        } else 
+            color = model_ptr->diffuse(uv)*diffuse;
+        return false;
+    }
+};
 
 
 
-/*Can swap in and shader*/
+
+/*Can swap in any shader*/
 void render_pipeline(Model &model, TGAImage &image, TGAImage &zbuffer)
 {
     float cam[3];
@@ -314,7 +432,7 @@ void render_pipeline(Model &model, TGAImage &image, TGAImage &zbuffer)
     mat<4,4> proj = projection_mat( -1.f / (eye-center).norm() ); 
     light_dir.normalize();
 
-    GourardSpecular shader(viewport, proj, modelview);
+    TangentNormalShader shader(viewport, proj, modelview);
 
     for (int i=0; i<model.nfaces(); i++) {
         vec4 screen_coords[3];
