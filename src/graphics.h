@@ -79,6 +79,51 @@ vec3 barycentric(vec2 vA, vec2 vB, vec2 vC, vec2 P)
 };
 
 
+void triangle(vec4 *pts, IShader &shader, TGAImage &image, std::vector<float> &zbuffer)
+{
+    vec3 pts3d[3];
+    for (int i: {0,1,2})
+        pts3d[i] = proj<3>(pts[i]/pts[i][3]);
+
+    vec2 bboxmin( std::numeric_limits<float>::max(),  std::numeric_limits<float>::max() );
+    vec2 bboxmax( -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max() );
+    vec2 clamp(image.width() - 1, image.height() - 1); //clip bb to image dims if triangle extends outside image
+    // Compute bounding box
+    for (int i = 0; i<3; i++) //for triangle vertex i
+        for (int j = 0; j<2; j++) //for coord (of x,y) j
+        {
+            bboxmin[j] = std::max(0.f,      std::min(bboxmin[j], pts3d[i][j]));
+            bboxmax[j] = std::min(clamp[j], std::max(bboxmax[j], pts3d[i][j]));
+        }
+    // For all points within the bounding box, computer the barycentric
+    // coordinates. If any are less than 0, the current point is not in
+    // the triangle, and we should skip. Otherwise, determine if the
+    // point's z dimension (depth) is closer to camera then the z buffer,
+    // and only render the point if it is.
+    TGAColor color;
+    for (int x = (int)bboxmin.x; x <= (int)bboxmax.x; x++)     /*cast coords to int or else we will miss faces/have holes*/
+        for (int y = (int)bboxmin.y; y <= (int)bboxmax.y; y++)
+        {
+            vec3 bc = barycentric(proj<2>(pts3d[0]), proj<2>(pts3d[1]), proj<2>(pts3d[2]),
+                                  vec2(x,y));
+            float z = pts[0][2] * bc.x + pts[1][2] * bc.y + pts[2][2] * bc.z;
+            float w = pts[0][3] * bc.x + pts[1][3] * bc.y + pts[2][3] * bc.z;
+            int frag_depth = std::max( 0, std::min(g_DEPTH, int(z / w+0.5)) );
+            
+            if (bc.x < 0 || bc.y < 0 || bc.z < 0 || frag_depth < zbuffer[x+y*image.width()]) continue;
+            bool discard = shader.fragment(bc, color);
+            if (!discard) {
+                zbuffer[x+y*image.width()] = frag_depth;
+                image.set(x, y, color);
+            }
+        }
+};
+
+
+
+
+
+
 void triangle(vec4 *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer)
 {
     vec3 pts3d[3];
@@ -92,8 +137,8 @@ void triangle(vec4 *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer)
     for (int i = 0; i<3; i++) //for triangle vertex i
         for (int j = 0; j<2; j++) //for coord (of x,y) j
         {
-            bboxmin[j] = std::min(bboxmin[j], pts3d[i][j]);
-            bboxmax[j] = std::max(bboxmax[j], pts3d[i][j]);
+            bboxmin[j] = std::max(0.f,      std::min(bboxmin[j], pts3d[i][j]));
+            bboxmax[j] = std::min(clamp[j], std::max(bboxmax[j], pts3d[i][j]));
         }
     // For all points within the bounding box, computer the barycentric
     // coordinates. If any are less than 0, the current point is not in

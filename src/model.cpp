@@ -84,7 +84,7 @@ Model::Model(const char *filename)
     
     // Load texture
     load_texture(filename, "_diffuse.tga",    diffusemap);
-    load_texture(filename, "_nm.tga", normalmap  ); //_nm_tangent
+    load_texture(filename, "_nm_tangent.tga", normalmap  ); //_nm_tangent
     load_texture(filename, "_spec.tga",       specularmap);
 
 }
